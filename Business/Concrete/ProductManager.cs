@@ -1,4 +1,5 @@
 ﻿using Business.Abstract;
+using Business.BusinessAspects.Autofac;
 using Business.CCS;
 using Business.Constants;
 using Business.ValidationRules.FluentValidation;
@@ -23,43 +24,36 @@ namespace Business.Concrete
         IProductDal _productDal;
         ICategoryService _categoryService;
 
-        public ProductManager(IProductDal productDal, ICategoryService categoryService)
+        public ProductManager(IProductDal productDal,ICategoryService categoryService)
         {
             _productDal = productDal;
             _categoryService = categoryService;
         }
 
+        //00.25 Dersteyiz
+        //Claim
+        [SecuredOperation("product.add,admin")]
         [ValidationAspect(typeof(ProductValidator))]
         public IResult Add(Product product)
         {
-            IResult result = BusinessRules.Run(CheckIfProductNameExists(product.ProductName),
-                CheckIfProductCountOfCategoryCorrect(product.CategoryId),
-                CheckIfCategoryLimitExceded());
 
-            if (result!=null)
+            //Aynı isimde ürün eklenemez
+            //Eğer mevcut kategori sayısı 15'i geçtiyse sisteme yeni ürün eklenemez. ve 
+            IResult result = BusinessRules.Run(CheckIfProductNameExists(product.ProductName), 
+                CheckIfProductCountOfCategoryCorrect(product.CategoryId), CheckIfCategoryLimitExceded());
+
+            if (result != null)
             {
                 return result;
             }
+
             _productDal.Add(product);
 
             return new SuccessResult(Messages.ProductAdded);
 
-            //_logger.Log();
-            //try
-            //{
-            //    business codes
 
-            //    _productDal.Add(product);
-
-            //    return new SuccessResult(Messages.ProductAdded);
-            //}
-            //catch (Exception exeption)
-            //{
-
-            //    _logger.Log();
-            //}
-            //return new ErrorResult();
-
+           
+            //23:10 Dersteyiz
         }
 
 
@@ -100,13 +94,19 @@ namespace Business.Concrete
         [ValidationAspect(typeof(ProductValidator))]
         public IResult Update(Product product)
         {
+            var result = _productDal.GetAll(p => p.CategoryId == product.CategoryId).Count;
+            if (result >= 10)
+            {
+                return new ErrorResult(Messages.ProductCountOfCategoryError);
+            }
             throw new NotImplementedException();
         }
 
         private IResult CheckIfProductCountOfCategoryCorrect(int categoryId)
         {
+            //Select count(*) from products where categoryId=1
             var result = _productDal.GetAll(p => p.CategoryId == categoryId).Count;
-            if (result >= 10)
+            if (result >= 15)
             {
                 return new ErrorResult(Messages.ProductCountOfCategoryError);
             }
@@ -130,7 +130,9 @@ namespace Business.Concrete
             {
                 return new ErrorResult(Messages.CategoryLimitExceded);
             }
+
             return new SuccessResult();
         }
+
     }
 }
